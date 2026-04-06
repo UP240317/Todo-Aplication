@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useFocusEffect, useRouter } from "expo-router";
+import { useCallback, useState } from "react";
 import {
   ScrollView,
   Text,
@@ -16,29 +17,27 @@ type Task = {
 export default function HomeScreen() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [title, setTitle] = useState("");
+  const router = useRouter();
 
-  const API_URL = "http://192.168.0.105:3000/tasks";
+  const API_URL = "http://10.10.150.253:3000/tasks";
 
-  // 🔥 CARGAR TAREAS
   const loadTasks = async () => {
     try {
       const res = await fetch(API_URL);
       const data = await res.json();
-
-      console.log("TASKS:", data);
-
       setTasks(data.data || []);
     } catch (error) {
       console.log("Error cargando tareas:", error);
     }
   };
 
-  // 🔥 CARGA INICIAL
-  useEffect(() => {
-    loadTasks();
-  }, []);
+  // Para recargar la lista de tareas cada vez que se regrese a esta pantalla
+  useFocusEffect(
+    useCallback(() => {
+      loadTasks();
+    }, [])
+  );
 
-  // 🔥 AGREGAR TAREA
   const addTasks = async () => {
     if (!title.trim()) return;
 
@@ -50,13 +49,9 @@ export default function HomeScreen() {
         },
         body: JSON.stringify({
           title: title.trim(),
-          description: "",
           completed: false
         })
       });
-
-      const result = await response.json();
-      console.log("POST RESULT:", result);
 
       if (response.ok) {
         setTitle("");
@@ -67,7 +62,6 @@ export default function HomeScreen() {
     }
   };
 
-  // 🔥 ELIMINAR TAREA
   const deleteTasks = async (id: number) => {
     try {
       await fetch(`${API_URL}/${id}`, {
@@ -80,111 +74,147 @@ export default function HomeScreen() {
     }
   };
 
+  const toggleTaskStatus = async (task: Task) => {
+    try {
+      await fetch(`${API_URL}/${task.id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          title: task.title,
+          completed: !task.completed
+        })
+      });
+
+      await loadTasks();
+    } catch (error) {
+      console.log("Error actualizando estado:", error);
+    }
+  };
+
   return (
     <ScrollView
       contentContainerStyle={{
         flexGrow: 1,
-        backgroundColor: "#f5f7fa",
+        backgroundColor: "#eef2f7",
         padding: 20,
         paddingTop: 60
       }}
     >
       <Text
         style={{
-          fontSize: 36,
-          fontWeight: "bold",
+          fontSize: 34,
+          fontWeight: "700",
           textAlign: "center",
           marginBottom: 25,
-          color: "#1e454c"
+          color: "#1f2937"
         }}
       >
         ToDo App
       </Text>
 
       <TextInput
-        placeholder="¿Qué hay para hoy?"
+        placeholder="Escribe una nueva tarea..."
         value={title}
         onChangeText={setTitle}
         style={{
           borderWidth: 1,
-          borderColor: "#d1d5db",
+          borderColor: "#dbe2ea",
           backgroundColor: "white",
-          padding: 14,
-          borderRadius: 15,
-          marginBottom: 15,
-          fontSize: 16
+          padding: 16,
+          borderRadius: 14,
+          marginBottom: 15
         }}
       />
 
       <TouchableOpacity
         onPress={addTasks}
         style={{
-          backgroundColor: "#348CCB",
-          padding: 15,
-          borderRadius: 15,
+          backgroundColor: "#2563eb",
+          padding: 16,
+          borderRadius: 14,
           alignItems: "center",
           marginBottom: 25
         }}
       >
-        <Text
-          style={{
-            color: "white",
-            fontWeight: "bold",
-            fontSize: 16
-          }}
-        >
+        <Text style={{ color: "white", fontWeight: "700" }}>
           Agregar tarea
         </Text>
       </TouchableOpacity>
 
       {tasks.map((task) => (
-        <View
+        <TouchableOpacity
           key={task.id}
+          onPress={() =>
+            router.push({
+              pathname: "../task/[id]",
+              params: { id: String(task.id) }
+            })
+          }
           style={{
             backgroundColor: "white",
             padding: 18,
-            borderRadius: 15,
-            marginBottom: 12,
-            flexDirection: "row",
-            justifyContent: "space-between",
-            alignItems: "center",
-            shadowColor: "#000",
-            shadowOpacity: 0.08,
-            shadowRadius: 4,
-            elevation: 3
+            borderRadius: 16,
+            marginBottom: 14
           }}
         >
           <Text
             style={{
-              color: "#1e454c",
-              flex: 1,
-              fontSize: 16
+              fontSize: 17,
+              fontWeight: "600",
+              color: task.completed ? "#9ca3af" : "#111827",
+              textDecorationLine: task.completed
+                ? "line-through"
+                : "none"
             }}
           >
-            {task.completed ? "completada" : "pendiente"}
             {task.title}
           </Text>
 
-          <TouchableOpacity
-            onPress={() => deleteTasks(task.id)}
+          <Text
             style={{
-              backgroundColor: "#ef4444",
-              paddingVertical: 8,
-              paddingHorizontal: 14,
-              borderRadius: 10,
-              marginLeft: 10
+              color: task.completed ? "#16a34a" : "#ff5500",
+              marginTop: 5
             }}
           >
-            <Text
+            {task.completed ? "Completada" : "Pendiente"}
+          </Text>
+
+          <View
+            style={{
+              flexDirection: "row",
+              gap: 10,
+              marginTop: 15
+            }}
+          >
+            <TouchableOpacity
+              onPress={() => toggleTaskStatus(task)}
               style={{
-                color: "white",
-                fontWeight: "bold"
+                backgroundColor: "#059669",
+                padding: 10,
+                borderRadius: 10
               }}
             >
-              🗑 Eliminar
-            </Text>
-          </TouchableOpacity>
-        </View>
+              <Text style={{ color: "white" }}>
+                Cambiar estado
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={() => deleteTasks(task.id)}
+              style={{
+                backgroundColor: "#dc2626",
+                padding: 10,
+                borderRadius: 10
+              }}
+            >
+              <Text style={{ color: "white" }}>
+                Eliminar
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
       ))}
     </ScrollView>
   );
